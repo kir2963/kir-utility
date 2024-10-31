@@ -32,11 +32,12 @@ public final class TCPServer implements AutoCloseable {
     }
 
     public void listen() {
-        Printer.printfc("Listening on port %d...", ConsoleColors.GREEN, port);
+        Printer.printfc("Listening on port %d...%n", ConsoleColors.GREEN, port);
         try (var ss = new ServerSocket(port)) {
             while (true) {
                 var client = ss.accept();
-                executor.submit(() -> handleClient(client, new CommandHandler(client, sharing)));
+                handleClient(client, new CommandHandler(client, sharing));
+                //executor.submit(() -> handleClient(client, new CommandHandler(client, sharing)));
             }
         } catch (IOException e) {
             Printer.error("Error starting server.");
@@ -46,7 +47,7 @@ public final class TCPServer implements AutoCloseable {
         }
     }
     public void listen(CommandHandler commandHandler) {
-        Printer.printfc("Listening on port %d...", ConsoleColors.GREEN, port);
+        Printer.printfc("Listening on port %d...%n", ConsoleColors.GREEN, port);
         try (var ss = new ServerSocket(port)) {
             while (true) {
                 var client = ss.accept();
@@ -62,6 +63,7 @@ public final class TCPServer implements AutoCloseable {
     }
 
     private void handleClient(Socket client, CommandHandler commandHandler) {
+        Printer.printfc("[%s] Connected.%n", ConsoleColors.CYAN, client.getRemoteSocketAddress().toString());
         var postman = new Postman(client);
         try {
             if (secret != null) {
@@ -69,18 +71,19 @@ public final class TCPServer implements AutoCloseable {
                 var resp = postman.recvMsg();
                 if (!Arrays.equals(resp.getBytes(), secret)) {
                     postman.sendMsg("Invalid credential.");
+                    Printer.printfc("[%s] Disconnected.%n", ConsoleColors.CYAN, client.getRemoteSocketAddress().toString());
                     return;
                 } else {
                     postman.sendMsg("OK");
                 }
             }
-            while (true) {
+            while (!client.isClosed()) {
                 var msg = postman.recvMsg();
                 var cmdArr = msg.split(" ");
-                var cmd = cmdArr[0];
-                var args = cmdArr.length > 1 ? Arrays.copyOfRange(cmdArr, 1, cmdArr.length - 1) : null;
-                commandHandler.handle(cmd, (Object) args);
+                var args = cmdArr.length > 1 ? Arrays.copyOfRange(cmdArr, 1, cmdArr.length - 1) : new Object();
+                commandHandler.handle(cmdArr[0], (Object) args);
             }
+            Printer.printfc("[%s] Disconnected.%n", ConsoleColors.CYAN, client.getRemoteSocketAddress().toString());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

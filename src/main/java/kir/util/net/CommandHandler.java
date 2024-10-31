@@ -29,23 +29,33 @@ public class CommandHandler {
         }
     }
 
-    public final void handle(String cmd, Object... args) throws InvocationTargetException, IllegalAccessException {
+    public final void handle(String cmd, Object... args) throws InvocationTargetException, IllegalAccessException, IOException {
         if (navCmd.contains(cmd)) {
             for (var method : this.getClass().getDeclaredMethods()) {
                 if (method.getName().equalsIgnoreCase(cmd)) {
                     method.setAccessible(true);
-                    method.invoke(this, args);
+                    var paramCount = method.getParameterCount();
+                    if (paramCount > 0) {
+                        Printer.println(method.getParameterTypes()[0].toString());
+                        Printer.println(args[0].getClass().getTypeName());
+                        method.invoke(this, args);
+                    }
+                    else method.invoke(this);
                 }
             }
         }
-        handleInternal(cmd, args);
+        if (!client.isClosed() && !handleInternal(cmd, args)) {
+            postman.sendMsg("Invalid command.");
+        };
     }
     /**
      * Override this method if you want to add your own logic
      * @param cmd The command
      * @param args Command argument(s)
      */
-    protected void handleInternal(String cmd, Object... args) {}
+    protected boolean handleInternal(String cmd, Object... args) {
+        return false;
+    }
 
     @SneakyThrows
     private void ls() {
@@ -108,8 +118,10 @@ public class CommandHandler {
     }
     private void dc() {
         try {
-            client.close();
+            if (!client.isClosed())
+                client.close();
         } catch (IOException e) {
+            Printer.error("Error here.");
             throw new RuntimeException(e);
         }
     }

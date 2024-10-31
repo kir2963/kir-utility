@@ -13,12 +13,15 @@ public final class TCPClient {
     private Socket socket;
     private Postman postman;
 
+    public String getHostName() {
+        return socket != null ? socket.getRemoteSocketAddress().toString() : null;
+    }
+
     public boolean connect(String host, int port) {
         if (socket != null) close();
         try {
             socket = new Socket(host, port);
             postman = new Postman(socket);
-            Printer.printfc("Connected to %s on port %d.%n", ConsoleColors.GREEN, host, port);
         } catch (IOException e) {
             return false;
         }
