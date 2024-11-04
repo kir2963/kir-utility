@@ -1,74 +1,89 @@
 package kir.util;
 
 import java.io.*;
-import java.nio.file.Path;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 public final class StickyFinger {
 
-    private static final int FILE_BUFFER = 1024;
+    private static final int FILE_BUFFER = 8192;
 
-    public static File zip(File target, String zipName, boolean includeHidden) throws IOException {
-        var fos = new FileOutputStream(zipName);
-        var zos = new ZipOutputStream(fos);
-        zipInternal(target, target.getName(), zos, includeHidden);
-        return new File(target, zipName);
-    }
-    private static void zipInternal(File target, String fileName, ZipOutputStream zos, boolean includeHidden) throws IOException {
-        if (target.isHidden() && !includeHidden) return;
-        if (target.isDirectory()) {
-            if (fileName.endsWith("/")) {
-                zos.putNextEntry(new ZipEntry(fileName));
-                zos.closeEntry();
-            } else {
-                zos.putNextEntry(new ZipEntry(fileName + "/"));
-                zos.closeEntry();
-            }
-            var childs = target.listFiles();
-            for (var child : childs) {
-                zipInternal(target, fileName + "/" + child.getName(), zos, includeHidden);
-            }
-            return;
-        }
-        var fis = new FileInputStream(target);
-        var zipEntry = new ZipEntry(fileName);
-        zos.putNextEntry(zipEntry);
-        var bytes = new byte[FILE_BUFFER];
-        int length;
-        while ((length = fis.read(bytes)) >= 0) {
-            zos.write(bytes, 0, length);
-        }
-        fis.close();
+    public static File zip(String zipName, List<File> src) {
+        return StickyFinger.zip(zipName, src.toArray(new File[0]));
     }
 
-    public static void unzip(File src, File dest) throws IOException {
+    public static File zip(String zipName, File... src) {
+        if (src.length == 0) throw new IllegalArgumentException("Source files must not be empty");
+        if (Arrays.stream(src).noneMatch(File::exists)) throw new RuntimeException("Invalid source.");
+
+        try (var zos = new ZipOutputStream(Files.newOutputStream(Paths.get(zipName)))) {
+            zos.setLevel(Deflater.NO_COMPRESSION);
+            var commonPath = Paths.get(src[0].getParent());
+            for (var item : src) {
+                if (item.isDirectory()) {
+                    Files.walk(item.toPath()).forEach(path -> {
+                        try {
+                            var relativePath = commonPath.relativize(path);
+                            var zipEntry = new ZipEntry(relativePath.toString());
+
+                            if (Files.isDirectory(path)) {
+                                zipEntry = new ZipEntry(relativePath + "/");
+                                zos.putNextEntry(zipEntry);
+                            } else {
+                                zos.putNextEntry(zipEntry);
+                                Files.copy(path, zos);
+                            }
+                            zos.closeEntry();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                } else {
+                    zos.putNextEntry(new ZipEntry(item.getName()));
+                    Files.copy(item.toPath(), zos);
+                    zos.closeEntry();
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return new File(zipName);
+    }
+
+    public static void unzip (File zipFile) {
+        unzip(zipFile, new File("./"));
+    }
+
+    public static void unzip(File zipFile, File dest) {
+        if (!zipFile.exists()) throw new RuntimeException("Invalid zip file.");
         if (!dest.exists()) dest.mkdirs();
 
-        var fis = new FileInputStream(src);
-        var zis = new ZipInputStream(fis);
-        var zipEntry = zis.getNextEntry();
-
-        while (zipEntry != null) {
-            var newFile = new File(dest, zipEntry.getName());
-            if (zipEntry.isDirectory()) {
-                newFile.mkdirs();
-            } else {
-                new File(newFile.getParent()).mkdirs();
-                var fos = new FileOutputStream(newFile);
-                var bytes = new byte[FILE_BUFFER];
-                int length;
-                while ((length = zis.read(bytes)) >= 0) {
-                    fos.write(bytes, 0, length);
+        try (var zis = new ZipInputStream(Files.newInputStream(zipFile.toPath()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                var entryPath = dest.toPath().resolve(entry.getName());
+                if (entry.isDirectory()) Files.createDirectories(entryPath);
+                else {
+                    Files.createDirectories(entryPath.getParent());
+                    try (var os = Files.newOutputStream(entryPath)) {
+                        var buffer = new byte[FILE_BUFFER];
+                        int bytesRead;
+                        while ((bytesRead = zis.read(buffer)) != -1) {
+                            os.write(buffer, 0, bytesRead);
+                        }
+                    }
                 }
-                fos.close();
             }
-            zipEntry = zis.getNextEntry();
+            zis.closeEntry();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-        zis.closeEntry();
-        zis.close();
-        fis.close();
     }
 
 }

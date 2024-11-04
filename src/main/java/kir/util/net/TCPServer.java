@@ -1,15 +1,13 @@
 package kir.util.net;
 
+import kir.util.CommandParser;
 import kir.util.ConsoleColors;
 import kir.util.Printer;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.security.GuardedObject;
 import java.util.Arrays;
-import java.util.PropertyPermission;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -36,7 +34,7 @@ public final class TCPServer implements AutoCloseable {
         try (var ss = new ServerSocket(port)) {
             while (true) {
                 var client = ss.accept();
-                handleClient(client, new CommandHandler(client, sharing));
+                handleClient(client, new CommandHandler(port, client, sharing));
                 //executor.submit(() -> handleClient(client, new CommandHandler(client, sharing)));
             }
         } catch (IOException e) {
@@ -79,9 +77,8 @@ public final class TCPServer implements AutoCloseable {
             }
             while (!client.isClosed()) {
                 var msg = postman.recvMsg();
-                var cmdArr = msg.split(" ");
-                var args = cmdArr.length > 1 ? Arrays.copyOfRange(cmdArr, 1, cmdArr.length - 1) : new Object();
-                commandHandler.handle(cmdArr[0], (Object) args);
+                var cmd = CommandParser.parse(msg);
+                commandHandler.handle(cmd.getKey(), String.join(" ", cmd.getValue()));
             }
             Printer.printfc("[%s] Disconnected.%n", ConsoleColors.CYAN, client.getRemoteSocketAddress().toString());
         } catch (Exception e) {

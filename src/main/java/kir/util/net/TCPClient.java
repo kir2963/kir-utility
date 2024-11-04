@@ -1,17 +1,25 @@
 package kir.util.net;
 
-import kir.util.ConsoleColors;
+import kir.util.CommandParser;
 import kir.util.Printer;
+import kir.util.StickyFinger;
 import lombok.SneakyThrows;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 
 public final class TCPClient {
 
     private Socket socket;
     private Postman postman;
+
+    private static final File SHARE_DIRECTORY = new File("received/");
 
     public String getHostName() {
         return socket != null ? socket.getRemoteSocketAddress().toString() : null;
@@ -29,26 +37,63 @@ public final class TCPClient {
     }
 
     @SneakyThrows
-    public void sendCmd(String cmd) {
+    public boolean sendCmd(String cmd) {
         if (socket == null) throw new RuntimeException("Not connected to any host");
-        var sendfCmdArr = cmd.split(" ");
-        if (sendfCmdArr[0].equalsIgnoreCase("sendf")) sendFile(sendfCmdArr[1]);
+        var sendfCmdArr = CommandParser.parse(cmd);
+
+        if (sendfCmdArr.getKey().equalsIgnoreCase("up")) {
+            if (sendfCmdArr.getValue().stream().map(File::new).anyMatch(f -> !f.exists())) {
+                Printer.error("Some files does not exist.");
+                return false;
+            }
+            postman.sendMsg(cmd);
+            if (sendfCmdArr.getValue().size() != 1) sendFiles(sendfCmdArr.getValue());
+            else sendFile(sendfCmdArr.getValue().get(0));
+            Printer.success("File sent.");
+            return true;
+        }
+
+        if (sendfCmdArr.getKey().equalsIgnoreCase("cp")) {
+            postman.sendMsg(cmd);
+            recvFile();
+            Printer.success("File saved to " + SHARE_DIRECTORY.getAbsolutePath());
+            return false;
+        }
+
         postman.sendMsg(cmd);
+        return true;
     }
 
     @SneakyThrows
-    private void sendFile(String path) throws IOException {
+    private void sendFile(String path) {
         var file = new File(path);
-        if (file.exists()) {
-            if (file.isDirectory()) postman.sendDir(file);
-            else postman.sendFile(file);
+        if (file.isDirectory()) postman.sendDir(file);
+        else postman.sendFile(file);
+    }
+
+    @SneakyThrows
+    private void sendFiles(List<String> files) {
+        var src = files.stream().map(File::new).toArray(File[]::new);
+        Files.createDirectories(Paths.get("./cache"));
+        var tmpName = "./cache/" + UUID.randomUUID() + ".zip";
+        postman.sendFile(StickyFinger.zip(tmpName, src), true);
+    }
+
+    private void recvFile() {
+        if (!SHARE_DIRECTORY.exists()) SHARE_DIRECTORY.mkdirs();
+        try {
+            postman.recvFile(SHARE_DIRECTORY);
+        } catch (IOException e) {
+            Printer.error(e.getMessage());
+            e.printStackTrace();
         }
     }
 
+
     @SneakyThrows
     public String sendw(String cmd) {
-        sendCmd(cmd);
-        return recvResponse();
+        if (sendCmd(cmd)) return recvResponse();
+        return "";
     }
 
     @SneakyThrows

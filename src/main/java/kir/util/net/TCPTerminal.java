@@ -23,7 +23,7 @@ public final class TCPTerminal {
                     break;
                 }
                 var resp = client.sendw(inp);
-                Printer.println(resp);
+                if (!resp.isEmpty()) Printer.println(resp);
             }
         }
     }

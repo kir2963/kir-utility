@@ -54,4 +54,21 @@ public final class Printer {
                 ConsoleColors.RED, str, ConsoleColors.RESET);
     }
 
+    public static void progress(double current, double max) {
+        if (current == max) {
+            printf("\r[DONE]%-50s%n", "");
+            return;
+        }
+        var currentPercentage = Math.floor(current / max * 50);
+        var strBuilder = new StringBuilder();
+        for (var i = 0; i <= currentPercentage; i++) {
+            if (i == currentPercentage) {
+                strBuilder.append(">");
+                continue;
+            }
+            strBuilder.append("=");
+        }
+        printfc("\r[%-50s]", ConsoleColors.BLUE, strBuilder.toString());
+    }
+
 }
