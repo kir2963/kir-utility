@@ -37,7 +37,7 @@ public final class NetClient implements Closeable {
     }
 
     public void setBufferSize(int bufSize) {
-        this.transceiver.setBufSize(bufSize);
+        this.transceiver.setBufferSize(bufSize);
     }
 
     public String sendw(String str) throws IOException {
@@ -50,7 +50,7 @@ public final class NetClient implements Closeable {
         var cmd = cmdArr.getKey();
 
         if (cmd.equalsIgnoreCase("up") || cmd.equalsIgnoreCase("cp")) {
-            Printer.printf("Current mode %s does not support file operations.", transceiver.getMode());
+            Printer.printf("Current mode %s does not support file operations.", transceiver.getSocketMode());
             return false;
         }
 

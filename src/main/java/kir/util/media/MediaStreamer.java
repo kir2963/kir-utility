@@ -1,8 +1,6 @@
 package kir.util.media;
 
 import kir.util.Printer;
-import lombok.Getter;
-import lombok.Setter;
 import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.*;
 
@@ -21,23 +19,28 @@ public final class MediaStreamer {
 
     private final BlockingQueue<String> mediaQueue = new LinkedBlockingQueue<>(255);
     private final String multicastAddress;
-    private final Resolution streamResolution;
+    private final int imageWidth;
+    private final int imageHeight;
 
-    @Getter
     private String currentFileName = null;
-
-    @Setter
     private String videoCodecName = null;
 
-    public MediaStreamer(String host, int port) {
-        this(host, port, Resolution.HD);
+    public MediaStreamer(String address, int port) {
+        this(address, port, 1366, 768);
     }
-    public MediaStreamer(String host, int port, Resolution resolution) {
-        multicastAddress = String.format("udp://%s:%d", host, port);
-        streamResolution = resolution;
-        FFmpegLogCallback.setLevel(avutil.AV_LOG_QUIET);
+    public MediaStreamer(String address, int port, int imageWidth, int imageHeight) {
+        multicastAddress = String.format("udp://%s:%d", address, port);
+        this.imageWidth = imageWidth;
+        this.imageHeight = imageHeight;
+        FFmpegLogCallback.setLevel(avutil.AV_LOG_FATAL);
     }
 
+    public String getCurrentFileName() {
+        return currentFileName;
+    }
+    public void setVideoCodecName(String videoCodecName) {
+        this.videoCodecName = videoCodecName;
+    }
     public List<String> getQueue() {
         return new ArrayList<>(mediaQueue);
     }
@@ -83,7 +86,6 @@ public final class MediaStreamer {
                 return FileVisitResult.CONTINUE;
             }
         });
-        Printer.success("Load success. Queue size: " + mediaQueue.size());
     }
 
     public boolean stream() throws FrameRecorder.Exception, FrameGrabber.Exception, InterruptedException {
@@ -110,15 +112,13 @@ public final class MediaStreamer {
         return new FFmpegFrameGrabber(source);
     }
     private FFmpegFrameRecorder buildRecorder(FFmpegFrameGrabber grabber) {
-//        var sw = streamResolution.getWidth() == -1 ? grabber.getImageWidth() : streamResolution.getWidth();
-//        var sh = streamResolution.getHeight() == -1 ? grabber.getImageHeight() : streamResolution.getHeight();
-        var recorder = new FFmpegFrameRecorder(multicastAddress, 1366, 768);
+        var recorder = new FFmpegFrameRecorder(multicastAddress, imageWidth, imageHeight);
         // Add options here
         recorder.setFormat("mpegts");
         recorder.setFrameRate(grabber.getFrameRate());
         recorder.setMetadata(grabber.getMetadata());
 
-        recorder.setVideoCodecName(videoCodecName == null ? "qsv" : videoCodecName);
+        recorder.setVideoCodecName(videoCodecName);
         recorder.setVideoOption("preset", "ultrafast");
         recorder.setVideoOption("tune", "zerolatency");
         recorder.setVideoBitrate(grabber.getVideoBitrate());

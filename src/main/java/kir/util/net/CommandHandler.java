@@ -48,8 +48,8 @@ public class CommandHandler {
         var cmdArgs = cmdArr.getValue().toArray(String[]::new);
         for (var method : this.getClass().getDeclaredMethods()) {
             if (method.isAnnotationPresent(Handler.class) && method.getName().equalsIgnoreCase(cmdArr.getKey())) {
-                if (FT.contains(method.getName()) && !transceiver.getMode().equals(SocketMode.TCP)) {
-                    transceiver.send("Current mode " + transceiver.getMode() + " does not support file operations.");
+                if (FT.contains(method.getName()) && !transceiver.getSocketMode().equals(SocketMode.TCP)) {
+                    transceiver.send("Current mode " + transceiver.getSocketMode() + " does not support file operations.");
                     handled = true;
                     break;
                 }

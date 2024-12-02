@@ -2,11 +2,10 @@ package kir.util.net;
 
 import kir.util.Printer;
 import kir.util.StickyFinger;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.io.*;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -15,9 +14,7 @@ public final class NetTransceiver implements Closeable {
 
     private final String CREATOR = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass().getSimpleName();
 
-    @Getter
     private final SocketMode mode;
-    @Getter @Setter
     private int bufSize;
 
     // TCP Socket Stream
@@ -32,12 +29,21 @@ public final class NetTransceiver implements Closeable {
     public NetTransceiver(NetSocket<?> socket, SocketMode mode) throws IOException {
         this(socket, mode, 2048);
     }
-
     public NetTransceiver(NetSocket<?> socket, SocketMode mode, int bufSize) throws IOException {
         if (bufSize <= 0) throw new IllegalArgumentException("Buffer size must be greater than 0");
         this.mode = mode;
         this.bufSize = bufSize;
         this.init(socket);
+    }
+
+    public SocketMode getSocketMode() {
+        return mode;
+    }
+    public int getBufferSize() {
+        return bufSize;
+    }
+    public void setBufferSize(int bufSize) {
+        this.bufSize = bufSize;
     }
 
     private void init(NetSocket<?> socket) throws IOException {
